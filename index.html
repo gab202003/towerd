@@ -7,6 +7,7 @@
     <style>
         canvas { border: 1px solid black; }
         #gameControls { margin-top: 10px; }
+        .active { background-color: #ff0000; color: white; }
     </style>
 </head>
 <body>
@@ -18,6 +19,7 @@
         <button id="addYellowPlant">Add Yellow Plant ($150)</button>
         <button id="addBluePlant">Add Blue Plant ($200)</button>
         <button id="addPinkPlant">Add Pink Plant ($125)</button>
+        <button id="deletePlant">Delete Plant</button>
         <span id="money">Money: $100</span>
         <span id="wave">Wave: 1</span>
         <span id="life">Life: 200</span>
@@ -52,6 +54,8 @@
         const COLUMNS = 8;
         const ROW_HEIGHT = canvas.height / ROWS;
         const COLUMN_WIDTH = canvas.width / COLUMNS;
+
+        let deleteMode = false;
 
         class Plant {
             constructor(row, col, color) {
@@ -346,6 +350,12 @@
             ctx.textAlign = 'right';
             ctx.fillText(`Level: ${level}`, canvas.width - 10, 30);
 
+            // Draw delete mode indicator
+            if (deleteMode) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
             spawnZombie();
             requestAnimationFrame(updateGame);
         }
@@ -360,6 +370,7 @@
         }
 
         function addPlant(color, cost) {
+            if (deleteMode) return;
             if (money >= cost) {
                 const rect = canvas.getBoundingClientRect();
                 const handleClick = (e) => {
@@ -384,12 +395,59 @@
             }
         }
 
-        addGreenPlantBtn.addEventListener('click', () => addPlant('green', 50));
-        addRedPlantBtn.addEventListener('click', () => addPlant('red', 75));
-        addBlackPlantBtn.addEventListener('click', () => addPlant('black', 100));
-        addYellowPlantBtn.addEventListener('click', () => addPlant('yellow', 150));
-        addBluePlantBtn.addEventListener('click', () => addPlant('blue', 200));
-        addPinkPlantBtn.addEventListener('click', () => addPlant('pink', 125));
+        function deletePlant() {
+            const rect = canvas.getBoundingClientRect();
+            const handleClick = (e) => {
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const col = Math.floor(x / COLUMN_WIDTH);
+                const row = Math.floor(y / ROW_HEIGHT);
+                
+                const plantIndex = plants.findIndex(plant => 
+                    Math.floor(plant.x / COLUMN_WIDTH) === col && 
+                    Math.floor(plant.y / ROW_HEIGHT) === row
+                );
+
+                if (plantIndex !== -1) {
+                    const plant = plants[plantIndex];
+                    const refundAmount = getPlantCost(plant.color) / 2;
+                    money += refundAmount;
+                    moneySpan.textContent = `Money: $${money}`;
+                    plants.splice(plantIndex, 1);
+                }
+            };
+            canvas.addEventListener('click', handleClick);
+        }
+
+        function getPlantCost(color) {
+            const costs = {
+                'green': 50,
+                'red': 75,
+                'black': 100,
+                'yellow': 150,
+                'blue': 200,
+                'pink': 125
+            };
+            return costs[color] || 0;
+        }
+
+        document.getElementById('addGreenPlant').addEventListener('click', () => addPlant('green', 50));
+        document.getElementById('addRedPlant').addEventListener('click', () => addPlant('red', 75));
+        document.getElementById('addBlackPlant').addEventListener('click', () => addPlant('black', 100));
+        document.getElementById('addYellowPlant').addEventListener('click', () => addPlant('yellow', 150));
+        document.getElementById('addBluePlant').addEventListener('click', () => addPlant('blue', 200));
+        document.getElementById('addPinkPlant').addEventListener('click', () => addPlant('pink', 125));
+
+        const deletePlantBtn = document.getElementById('deletePlant');
+        deletePlantBtn.addEventListener('click', () => {
+            deleteMode = !deleteMode;
+            deletePlantBtn.classList.toggle('active');
+            if (deleteMode) {
+                deletePlant();
+            } else {
+                canvas.removeEventListener('click', deletePlant);
+            }
+        });
 
         // Initialize plants in the first column
         for (let i = 0; i < ROWS; i++) {
