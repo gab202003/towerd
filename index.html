@@ -20,6 +20,7 @@
         <span id="money">Money: $100</span>
         <span id="wave">Wave: 1</span>
         <span id="life">Life: 200</span>
+        <span id="level">Level: 1</span>
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -40,6 +41,10 @@
         let zombies = [];
         let bullets = [];
         let zombieBullets = [];
+
+        let level = 1;
+        let zombiesKilled = 0;
+        const zombiesPerLevel = 100;
 
         const ROWS = 5;
         const COLUMNS = 8;
@@ -191,7 +196,7 @@
         }
 
         function spawnZombie() {
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.02 * (1 + (level - 1) * 0.1)) { // Increase spawn rate with level
                 zombies.push(new Zombie(Math.random() < 0.2 ? 'pink' : 'normal'));
             }
         }
@@ -234,6 +239,8 @@
                             zombies.splice(zIndex, 1);
                             money += 25;
                             moneySpan.textContent = `Money: $${money}`;
+                            zombiesKilled++;
+                            checkLevelUp();
                         } else {
                             zombie.attack(plant);
                         }
@@ -249,8 +256,6 @@
                         alert('Game Over!');
                         location.reload();
                     }
-                    wave++;
-                    waveSpan.textContent = `Wave: ${wave}`;
                 }
             });
 
@@ -261,34 +266,19 @@
                     bullets.splice(bIndex, 1);
                 }
 
-                let hitZombie = false;
                 zombies.forEach((zombie, zIndex) => {
                     if (Math.abs(bullet.y - zombie.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - zombie.x) < 20) {
-                        hitZombie = true;
-                        if (bullet.color === 'black') {
-                            createExplosion(bullet.x, bullet.y);
-                            zombies.forEach(z => {
-                                if (Math.abs(z.y - zombie.y) < ROW_HEIGHT && Math.abs(z.x - zombie.x) < 60) {
-                                    z.health -= 50;
-                                }
-                            });
-                        } else {
-                            zombie.health -= 25;
-                            if (bullet.color === 'red') {
-                                zombie.slowdownTimer = 120; // Slow for 2 seconds (120 frames)
-                            }
-                        }
+                        zombie.health -= 25;
+                        bullets.splice(bIndex, 1);
                         if (zombie.health <= 0) {
                             zombies.splice(zIndex, 1);
                             money += 25;
                             moneySpan.textContent = `Money: $${money}`;
+                            zombiesKilled++;
+                            checkLevelUp();
                         }
                     }
                 });
-
-                if (hitZombie) {
-                    bullets.splice(bIndex, 1);
-                }
             });
 
             zombieBullets.forEach((bullet, bIndex) => {
@@ -315,8 +305,23 @@
             ctx.fillStyle = 'green';
             ctx.fillRect(10, 10, life, 20);
 
+            // Draw level
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Level: ${level}`, canvas.width - 10, 30);
+
             spawnZombie();
             requestAnimationFrame(updateGame);
+        }
+
+        function checkLevelUp() {
+            if (zombiesKilled >= zombiesPerLevel) {
+                level++;
+                zombiesKilled = 0;
+                document.getElementById('level').textContent = `Level: ${level}`;
+                // Increase difficulty here, e.g., spawn zombies more frequently
+            }
         }
 
         function addPlant(color, cost) {
@@ -359,3 +364,4 @@
     </script>
 </body>
 </html>
+
