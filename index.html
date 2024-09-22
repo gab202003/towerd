@@ -288,7 +288,6 @@
                 }
 
                 zombies.forEach((zombie, zIndex) => {
-<<<<<<< HEAD
                     if (bullet.isVertical) {
                         if (Math.abs(bullet.x - zombie.x) < COLUMN_WIDTH / 2 && Math.abs(bullet.y - zombie.y) < 20) {
                             zombie.health -= 25;
@@ -312,17 +311,6 @@
                                 zombiesKilled++;
                                 checkLevelUp();
                             }
-=======
-                    if (Math.abs(bullet.y - zombie.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - zombie.x) < 20) {
-                        zombie.health -= 25;
-                        bullets.splice(bIndex, 1);
-                        if (zombie.health <= 0) {
-                            zombies.splice(zIndex, 1);
-                            money += 25;
-                            moneySpan.textContent = `Money: $${money}`;
-                            zombiesKilled++;
-                            checkLevelUp();
->>>>>>> main
                         }
                     }
                 });
@@ -412,4 +400,3 @@
     </script>
 </body>
 </html>
-
