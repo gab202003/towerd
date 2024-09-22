@@ -17,9 +17,11 @@
         <button id="addBlackPlant">Add Black Plant ($100)</button>
         <button id="addYellowPlant">Add Yellow Plant ($150)</button>
         <button id="addBluePlant">Add Blue Plant ($200)</button>
+        <button id="addPinkPlant">Add Pink Plant ($125)</button>
         <span id="money">Money: $100</span>
         <span id="wave">Wave: 1</span>
         <span id="life">Life: 200</span>
+        <span id="level">Level: 1</span>
     </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -29,6 +31,7 @@
         const addBlackPlantBtn = document.getElementById('addBlackPlant');
         const addYellowPlantBtn = document.getElementById('addYellowPlant');
         const addBluePlantBtn = document.getElementById('addBluePlant');
+        const addPinkPlantBtn = document.getElementById('addPinkPlant');
         const moneySpan = document.getElementById('money');
         const waveSpan = document.getElementById('wave');
         const lifeSpan = document.getElementById('life');
@@ -40,6 +43,10 @@
         let zombies = [];
         let bullets = [];
         let zombieBullets = [];
+
+        let level = 1;
+        let zombiesKilled = 0;
+        const zombiesPerLevel = 100;
 
         const ROWS = 5;
         const COLUMNS = 8;
@@ -54,6 +61,7 @@
                 this.color = color;
                 this.moneyCooldown = 0;
                 this.health = color === 'blue' ? 200 : 100;
+                this.row = row;
             }
 
             draw() {
@@ -79,10 +87,23 @@
 
             shoot() {
                 if (this.shootCooldown <= 0) {
-                    bullets.push(new Bullet(this.x, this.y, this.color));
-                    this.shootCooldown = this.color === 'black' ? 120 : 60; // Black plants shoot slower
+                    if (this.color === 'pink') {
+                        this.shootVertical();
+                    } else {
+                        bullets.push(new Bullet(this.x, this.y, this.color));
+                    }
+                    this.shootCooldown = this.color === 'black' ? 120 : 60;
                 }
                 this.shootCooldown--;
+            }
+
+            shootVertical() {
+                const zombiesInColumn = zombies.filter(zombie => 
+                    Math.abs(zombie.x - this.x) < COLUMN_WIDTH / 2
+                );
+                if (zombiesInColumn.length > 0) {
+                    bullets.push(new Bullet(this.x, this.y, this.color, true));
+                }
             }
 
             generateMoney() {
@@ -164,11 +185,12 @@
         }
 
         class Bullet {
-            constructor(x, y, color) {
+            constructor(x, y, color, isVertical = false) {
                 this.x = x;
                 this.y = y;
                 this.speed = 5;
                 this.color = color;
+                this.isVertical = isVertical;
             }
 
             draw() {
@@ -179,7 +201,11 @@
             }
 
             move() {
-                this.x += this.speed;
+                if (this.isVertical) {
+                    this.y -= this.speed;
+                } else {
+                    this.x += this.speed;
+                }
             }
         }
 
@@ -191,7 +217,7 @@
         }
 
         function spawnZombie() {
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.02 * (1 + (level - 1) * 0.1)) { // Increase spawn rate with level
                 zombies.push(new Zombie(Math.random() < 0.2 ? 'pink' : 'normal'));
             }
         }
@@ -234,6 +260,8 @@
                             zombies.splice(zIndex, 1);
                             money += 25;
                             moneySpan.textContent = `Money: $${money}`;
+                            zombiesKilled++;
+                            checkLevelUp();
                         } else {
                             zombie.attack(plant);
                         }
@@ -249,46 +277,43 @@
                         alert('Game Over!');
                         location.reload();
                     }
-                    wave++;
-                    waveSpan.textContent = `Wave: ${wave}`;
                 }
             });
 
             bullets.forEach((bullet, bIndex) => {
                 bullet.draw();
                 bullet.move();
-                if (bullet.x > canvas.width) {
+                if (bullet.x > canvas.width || bullet.y < 0) {
                     bullets.splice(bIndex, 1);
                 }
 
-                let hitZombie = false;
                 zombies.forEach((zombie, zIndex) => {
-                    if (Math.abs(bullet.y - zombie.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - zombie.x) < 20) {
-                        hitZombie = true;
-                        if (bullet.color === 'black') {
-                            createExplosion(bullet.x, bullet.y);
-                            zombies.forEach(z => {
-                                if (Math.abs(z.y - zombie.y) < ROW_HEIGHT && Math.abs(z.x - zombie.x) < 60) {
-                                    z.health -= 50;
-                                }
-                            });
-                        } else {
+                    if (bullet.isVertical) {
+                        if (Math.abs(bullet.x - zombie.x) < COLUMN_WIDTH / 2 && Math.abs(bullet.y - zombie.y) < 20) {
                             zombie.health -= 25;
-                            if (bullet.color === 'red') {
-                                zombie.slowdownTimer = 120; // Slow for 2 seconds (120 frames)
+                            bullets.splice(bIndex, 1);
+                            if (zombie.health <= 0) {
+                                zombies.splice(zIndex, 1);
+                                money += 25;
+                                moneySpan.textContent = `Money: $${money}`;
+                                zombiesKilled++;
+                                checkLevelUp();
                             }
                         }
-                        if (zombie.health <= 0) {
-                            zombies.splice(zIndex, 1);
-                            money += 25;
-                            moneySpan.textContent = `Money: $${money}`;
+                    } else {
+                        if (Math.abs(bullet.y - zombie.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - zombie.x) < 20) {
+                            zombie.health -= 25;
+                            bullets.splice(bIndex, 1);
+                            if (zombie.health <= 0) {
+                                zombies.splice(zIndex, 1);
+                                money += 25;
+                                moneySpan.textContent = `Money: $${money}`;
+                                zombiesKilled++;
+                                checkLevelUp();
+                            }
                         }
                     }
                 });
-
-                if (hitZombie) {
-                    bullets.splice(bIndex, 1);
-                }
             });
 
             zombieBullets.forEach((bullet, bIndex) => {
@@ -315,8 +340,23 @@
             ctx.fillStyle = 'green';
             ctx.fillRect(10, 10, life, 20);
 
+            // Draw level
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Level: ${level}`, canvas.width - 10, 30);
+
             spawnZombie();
             requestAnimationFrame(updateGame);
+        }
+
+        function checkLevelUp() {
+            if (zombiesKilled >= zombiesPerLevel) {
+                level++;
+                zombiesKilled = 0;
+                document.getElementById('level').textContent = `Level: ${level}`;
+                // Increase difficulty here, e.g., spawn zombies more frequently
+            }
         }
 
         function addPlant(color, cost) {
@@ -349,6 +389,7 @@
         addBlackPlantBtn.addEventListener('click', () => addPlant('black', 100));
         addYellowPlantBtn.addEventListener('click', () => addPlant('yellow', 150));
         addBluePlantBtn.addEventListener('click', () => addPlant('blue', 200));
+        addPinkPlantBtn.addEventListener('click', () => addPlant('pink', 125));
 
         // Initialize plants in the first column
         for (let i = 0; i < ROWS; i++) {
