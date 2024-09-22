@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant vs Zombie Tower Defense</title>
+    <style>
+        canvas { border: 1px solid black; }
+        #gameControls { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="gameControls">
+        <button id="addGreenPlant">Add Green Plant ($50)</button>
+        <button id="addRedPlant">Add Red Plant ($75)</button>
+        <button id="addBlackPlant">Add Black Plant ($100)</button>
+        <button id="addYellowPlant">Add Yellow Plant ($150)</button>
+        <button id="addBluePlant">Add Blue Plant ($200)</button>
+        <span id="money">Money: $100</span>
+        <span id="wave">Wave: 1</span>
+        <span id="life">Life: 200</span>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const addGreenPlantBtn = document.getElementById('addGreenPlant');
+        const addRedPlantBtn = document.getElementById('addRedPlant');
+        const addBlackPlantBtn = document.getElementById('addBlackPlant');
+        const addYellowPlantBtn = document.getElementById('addYellowPlant');
+        const addBluePlantBtn = document.getElementById('addBluePlant');
+        const moneySpan = document.getElementById('money');
+        const waveSpan = document.getElementById('wave');
+        const lifeSpan = document.getElementById('life');
+
+        let money = 100;
+        let wave = 1;
+        let life = 200;
+        let plants = [];
+        let zombies = [];
+        let bullets = [];
+        let zombieBullets = [];
+
+        const ROWS = 5;
+        const COLUMNS = 8;
+        const ROW_HEIGHT = canvas.height / ROWS;
+        const COLUMN_WIDTH = canvas.width / COLUMNS;
+
+        class Plant {
+            constructor(row, col, color) {
+                this.x = col * COLUMN_WIDTH + COLUMN_WIDTH / 2;
+                this.y = row * ROW_HEIGHT + ROW_HEIGHT / 2;
+                this.shootCooldown = 0;
+                this.color = color;
+                this.moneyCooldown = 0;
+                this.health = color === 'blue' ? 200 : 100;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw health bar
+                ctx.fillStyle = 'red';
+                ctx.fillRect(this.x - 20, this.y - 30, 40, 5);
+                ctx.fillStyle = 'green';
+                ctx.fillRect(this.x - 20, this.y - 30, this.health / (this.color === 'blue' ? 5 : 2.5), 5);
+            }
+
+            update() {
+                if (this.color === 'yellow') {
+                    this.generateMoney();
+                } else if (this.color !== 'blue') {
+                    this.shoot();
+                }
+            }
+
+            shoot() {
+                if (this.shootCooldown <= 0) {
+                    bullets.push(new Bullet(this.x, this.y, this.color));
+                    this.shootCooldown = this.color === 'black' ? 120 : 60; // Black plants shoot slower
+                }
+                this.shootCooldown--;
+            }
+
+            generateMoney() {
+                if (this.moneyCooldown <= 0) {
+                    money += 100;
+                    moneySpan.textContent = `Money: $${money}`;
+                    this.moneyCooldown = 120; // 2 seconds (120 frames)
+                    
+                    // Visual feedback for money generation
+                    ctx.fillStyle = 'gold';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('+$100', this.x, this.y - 30);
+                }
+                this.moneyCooldown--;
+            }
+        }
+
+        class Zombie {
+            constructor(type = 'normal') {
+                this.x = canvas.width;
+                this.row = Math.floor(Math.random() * ROWS);
+                this.y = this.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+                this.speed = 1;
+                this.health = type === 'pink' ? 150 : 100;
+                this.slowdownTimer = 0;
+                this.attackCooldown = 0;
+                this.type = type;
+                this.shootCooldown = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.type === 'pink' ? 'pink' : (this.slowdownTimer > 0 ? 'purple' : 'gray');
+                ctx.fillRect(this.x - 15, this.y - 25, 30, 50);
+            }
+
+            move() {
+                if (this.slowdownTimer > 0) {
+                    this.x -= this.speed / 2;
+                    this.slowdownTimer--;
+                } else {
+                    this.x -= this.speed;
+                }
+            }
+
+            attack(plant) {
+                if (this.attackCooldown <= 0) {
+                    plant.health -= 10;
+                    this.attackCooldown = 60; // Attack every second
+                }
+                this.attackCooldown--;
+            }
+
+            shoot() {
+                if (this.type === 'pink' && this.shootCooldown <= 0) {
+                    zombieBullets.push(new ZombieBullet(this.x, this.y));
+                    this.shootCooldown = 120; // Shoot every 2 seconds
+                }
+                this.shootCooldown--;
+            }
+        }
+
+        class ZombieBullet {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.speed = 3;
+            }
+
+            draw() {
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            move() {
+                this.x -= this.speed;
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.speed = 5;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            move() {
+                this.x += this.speed;
+            }
+        }
+
+        function createExplosion(x, y) {
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.arc(x, y, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function spawnZombie() {
+            if (Math.random() < 0.02) {
+                zombies.push(new Zombie(Math.random() < 0.2 ? 'pink' : 'normal'));
+            }
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            for (let i = 1; i < ROWS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * ROW_HEIGHT);
+                ctx.lineTo(canvas.width, i * ROW_HEIGHT);
+                ctx.stroke();
+            }
+            for (let i = 1; i < COLUMNS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * COLUMN_WIDTH, 0);
+                ctx.lineTo(i * COLUMN_WIDTH, canvas.height);
+                ctx.stroke();
+            }
+
+            plants.forEach((plant, pIndex) => {
+                plant.draw();
+                plant.update();
+
+                if (plant.health <= 0) {
+                    plants.splice(pIndex, 1);
+                }
+            });
+
+            zombies.forEach((zombie, zIndex) => {
+                zombie.draw();
+                zombie.move();
+                zombie.shoot();
+
+                // Check for collision with plants
+                plants.forEach((plant, pIndex) => {
+                    if (Math.abs(zombie.x - plant.x) < 30 && Math.abs(zombie.y - plant.y) < ROW_HEIGHT / 2) {
+                        if (plant.color === 'blue') {
+                            zombies.splice(zIndex, 1);
+                            money += 25;
+                            moneySpan.textContent = `Money: $${money}`;
+                        } else {
+                            zombie.attack(plant);
+                        }
+                        return; // Stop moving if attacking a plant or killed by blue plant
+                    }
+                });
+
+                if (zombie.x < 0) {
+                    zombies.splice(zIndex, 1);
+                    life -= 10;
+                    lifeSpan.textContent = `Life: ${life}`;
+                    if (life <= 0) {
+                        alert('Game Over!');
+                        location.reload();
+                    }
+                    wave++;
+                    waveSpan.textContent = `Wave: ${wave}`;
+                }
+            });
+
+            bullets.forEach((bullet, bIndex) => {
+                bullet.draw();
+                bullet.move();
+                if (bullet.x > canvas.width) {
+                    bullets.splice(bIndex, 1);
+                }
+
+                let hitZombie = false;
+                zombies.forEach((zombie, zIndex) => {
+                    if (Math.abs(bullet.y - zombie.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - zombie.x) < 20) {
+                        hitZombie = true;
+                        if (bullet.color === 'black') {
+                            createExplosion(bullet.x, bullet.y);
+                            zombies.forEach(z => {
+                                if (Math.abs(z.y - zombie.y) < ROW_HEIGHT && Math.abs(z.x - zombie.x) < 60) {
+                                    z.health -= 50;
+                                }
+                            });
+                        } else {
+                            zombie.health -= 25;
+                            if (bullet.color === 'red') {
+                                zombie.slowdownTimer = 120; // Slow for 2 seconds (120 frames)
+                            }
+                        }
+                        if (zombie.health <= 0) {
+                            zombies.splice(zIndex, 1);
+                            money += 25;
+                            moneySpan.textContent = `Money: $${money}`;
+                        }
+                    }
+                });
+
+                if (hitZombie) {
+                    bullets.splice(bIndex, 1);
+                }
+            });
+
+            zombieBullets.forEach((bullet, bIndex) => {
+                bullet.draw();
+                bullet.move();
+                if (bullet.x < 0) {
+                    zombieBullets.splice(bIndex, 1);
+                }
+
+                plants.forEach((plant, pIndex) => {
+                    if (Math.abs(bullet.y - plant.y) < ROW_HEIGHT / 2 && Math.abs(bullet.x - plant.x) < 20) {
+                        plant.health -= 15;
+                        zombieBullets.splice(bIndex, 1);
+                        if (plant.health <= 0) {
+                            plants.splice(pIndex, 1);
+                        }
+                    }
+                });
+            });
+
+            // Draw life bar
+            ctx.fillStyle = 'red';
+            ctx.fillRect(10, 10, 200, 20);
+            ctx.fillStyle = 'green';
+            ctx.fillRect(10, 10, life, 20);
+
+            spawnZombie();
+            requestAnimationFrame(updateGame);
+        }
+
+        function addPlant(color, cost) {
+            if (money >= cost) {
+                const rect = canvas.getBoundingClientRect();
+                const handleClick = (e) => {
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const col = Math.floor(x / COLUMN_WIDTH);
+                    const row = Math.floor(y / ROW_HEIGHT);
+                    
+                    const plantExists = plants.some(plant => 
+                        Math.floor(plant.x / COLUMN_WIDTH) === col && 
+                        Math.floor(plant.y / ROW_HEIGHT) === row
+                    );
+
+                    if (!plantExists) {
+                        plants.push(new Plant(row, col, color));
+                        money -= cost;
+                        moneySpan.textContent = `Money: $${money}`;
+                        canvas.removeEventListener('click', handleClick);
+                    }
+                };
+                canvas.addEventListener('click', handleClick);
+            }
+        }
+
+        addGreenPlantBtn.addEventListener('click', () => addPlant('green', 50));
+        addRedPlantBtn.addEventListener('click', () => addPlant('red', 75));
+        addBlackPlantBtn.addEventListener('click', () => addPlant('black', 100));
+        addYellowPlantBtn.addEventListener('click', () => addPlant('yellow', 150));
+        addBluePlantBtn.addEventListener('click', () => addPlant('blue', 200));
+
+        // Initialize plants in the first column
+        for (let i = 0; i < ROWS; i++) {
+            plants.push(new Plant(i, 0, 'green'));
+        }
+
+        updateGame();
+    </script>
+</body>
+</html>
